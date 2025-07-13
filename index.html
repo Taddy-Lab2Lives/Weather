@@ -699,7 +699,78 @@
             button.classList.add('active');
             
             currentDate = date;
-            updateChart();
+            
+            // Show loading animation
+            showLoading(true, 'pulse');
+            
+            // Load weather data for selected date
+            loadWeatherDataForDate(date);
+        }
+
+        // Load weather data for specific date
+        function loadWeatherDataForDate(selectedDate) {
+            const today = new Date();
+            const dayDiff = Math.floor((selectedDate - today) / (1000 * 60 * 60 * 24));
+            
+            // Generate different weather data based on selected date
+            const baseTemp = 28;
+            const tempVariation = dayDiff * 1.5; // Temperature varies by date
+            const weatherConditions = ['Clear', 'Clouds', 'Rain', 'Drizzle'];
+            const selectedCondition = weatherConditions[Math.abs(dayDiff) % weatherConditions.length];
+            
+            // Create date-specific weather data
+            const dateSpecificData = {
+                current: {
+                    temp: Math.round(baseTemp + tempVariation + Math.sin(dayDiff) * 3),
+                    feels_like: Math.round(baseTemp + tempVariation + Math.sin(dayDiff) * 3 + 2),
+                    humidity: Math.round(78 + Math.sin(dayDiff * 2) * 15),
+                    wind_speed: Math.round((3.2 + Math.cos(dayDiff) * 2) * 10) / 10,
+                    visibility: 8000 + Math.sin(dayDiff) * 2000,
+                    weather: [{
+                        main: selectedCondition,
+                        description: getVietnameseWeatherDescription(selectedCondition),
+                        icon: getWeatherIcon(selectedCondition)
+                    }]
+                },
+                hourly: Array.from({length: 24}, (_, i) => ({
+                    dt: selectedDate.getTime() / 1000 + (i * 3600),
+                    temp: Math.round((baseTemp + tempVariation + Math.sin((i + dayDiff) * Math.PI / 12) * 4 + Math.random() * 2) * 10) / 10,
+                    humidity: Math.round(70 + Math.sin((i + dayDiff) * Math.PI / 8) * 20 + Math.random() * 10),
+                    pop: Math.max(0, Math.min(1, Math.sin((i + dayDiff) * Math.PI / 6) * 0.5 + 0.3 + Math.random() * 0.2)),
+                    rain: Math.random() > (0.7 - Math.abs(dayDiff) * 0.1) ? {['1h']: Math.random() * 5} : undefined
+                }))
+            };
+            
+            // Update global weather data
+            weatherData = dateSpecificData;
+            
+            // Update UI with new data
+            setTimeout(() => {
+                updateUI();
+                showLoading(false);
+            }, 800);
+        }
+        
+        // Helper function to get Vietnamese weather description
+        function getVietnameseWeatherDescription(condition) {
+            const descriptions = {
+                'Clear': 'Trời quang',
+                'Clouds': 'Nhiều mây',
+                'Rain': 'Mưa',
+                'Drizzle': 'Mưa phùn'
+            };
+            return descriptions[condition] || 'Nhiều mây';
+        }
+        
+        // Helper function to get weather icon
+        function getWeatherIcon(condition) {
+            const icons = {
+                'Clear': '01d',
+                'Clouds': '04d',
+                'Rain': '10d',
+                'Drizzle': '09d'
+            };
+            return icons[condition] || '04d';
         }
 
         // Initialize chart

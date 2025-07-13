@@ -1,0 +1,852 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#1e40af">
+    <title>Weather TPHCM - Thời Tiết Hồ Chí Minh</title>
+    
+    <!-- PWA Meta Tags -->
+    <link rel="manifest" href="manifest.json">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Weather TPHCM">
+    
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Bootstrap Icons -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <style>
+        :root {
+            --primary-color: #1e40af;
+            --text-light: #ffffff;
+            --text-dark: #1f2937;
+            --shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            --border-radius: 16px;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            overflow-x: hidden;
+            transition: all 0.5s ease;
+            min-height: 100vh;
+        }
+
+        /* Dynamic Backgrounds */
+        .bg-sunny {
+            background: linear-gradient(135deg, #74b9ff 0%, #0984e3 50%, #fdcb6e 100%);
+            animation: sunnyGlow 3s ease-in-out infinite alternate;
+        }
+
+        .bg-rainy {
+            background: linear-gradient(135deg, #636e72 0%, #2d3436 50%, #74b9ff 100%);
+            position: relative;
+        }
+
+        .bg-cloudy {
+            background: linear-gradient(135deg, #a29bfe 0%, #6c5ce7 50%, #74b9ff 100%);
+        }
+
+        .bg-night {
+            background: linear-gradient(135deg, #2d3436 0%, #636e72 50%, #1e3799 100%);
+            position: relative;
+        }
+
+        @keyframes sunnyGlow {
+            0% { filter: brightness(1) saturate(1); }
+            100% { filter: brightness(1.1) saturate(1.2); }
+        }
+
+        /* Rain Animation */
+        .rain {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 1;
+        }
+
+        .raindrop {
+            position: absolute;
+            background: linear-gradient(transparent, rgba(255,255,255,0.6), transparent);
+            width: 2px;
+            height: 15px;
+            animation: fall linear infinite;
+        }
+
+        @keyframes fall {
+            to { transform: translateY(100vh); }
+        }
+
+        /* Stars Animation */
+        .stars {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 1;
+        }
+
+        .star {
+            position: absolute;
+            background: white;
+            border-radius: 50%;
+            animation: twinkle 2s ease-in-out infinite alternate;
+        }
+
+        @keyframes twinkle {
+            0% { opacity: 0.3; }
+            100% { opacity: 1; }
+        }
+
+        /* Header Styles */
+        .weather-header {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(20px);
+            border-radius: 0 0 var(--border-radius) var(--border-radius);
+            color: var(--text-light);
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: var(--shadow);
+            position: relative;
+            z-index: 10;
+        }
+
+        .temp-display {
+            font-size: 3.5rem;
+            font-weight: 300;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .weather-info {
+            font-size: 1.1rem;
+            opacity: 0.9;
+        }
+
+        .weather-icon {
+            font-size: 4rem;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.3);
+        }
+
+        /* Chart Container */
+        .chart-container {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: var(--border-radius);
+            padding: 20px;
+            margin: 20px 10px;
+            box-shadow: var(--shadow);
+            position: relative;
+            z-index: 10;
+        }
+
+        .chart-wrapper {
+            position: relative;
+            height: 300px;
+            width: 100%;
+        }
+
+        /* Date Picker */
+        .date-picker {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(20px);
+            border-radius: var(--border-radius);
+            padding: 15px;
+            margin: 10px;
+            box-shadow: var(--shadow);
+            position: relative;
+            z-index: 10;
+        }
+
+        .date-btn {
+            background: rgba(255, 255, 255, 0.2);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            color: var(--text-light);
+            border-radius: 12px;
+            padding: 8px 12px;
+            margin: 2px;
+            transition: all 0.3s ease;
+            font-size: 0.9rem;
+        }
+
+        .date-btn:hover, .date-btn.active {
+            background: rgba(255, 255, 255, 0.3);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+        }
+
+        /* Loading Spinner */
+        .loading {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 1000;
+        }
+
+        .spinner {
+            width: 50px;
+            height: 50px;
+            border: 4px solid rgba(255,255,255,0.3);
+            border-top: 4px solid white;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* Footer */
+        .footer {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(20px);
+            color: var(--text-light);
+            text-align: center;
+            padding: 15px;
+            margin-top: 20px;
+            position: relative;
+            z-index: 10;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .temp-display {
+                font-size: 2.5rem;
+            }
+            
+            .weather-icon {
+                font-size: 3rem;
+            }
+            
+            .chart-wrapper {
+                height: 250px;
+            }
+            
+            .date-btn {
+                font-size: 0.8rem;
+                padding: 6px 10px;
+            }
+        }
+
+        /* Animations */
+        .fade-in {
+            animation: fadeIn 0.5s ease-in;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .slide-in {
+            animation: slideIn 0.5s ease-out;
+        }
+
+        @keyframes slideIn {
+            from { transform: translateX(-100%); }
+            to { transform: translateX(0); }
+        }
+
+        /* Pull to refresh */
+        .pull-refresh {
+            position: absolute;
+            top: -60px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: var(--text-light);
+            font-size: 14px;
+            opacity: 0;
+            transition: all 0.3s ease;
+        }
+
+        .pull-refresh.active {
+            opacity: 1;
+            top: -40px;
+        }
+    </style>
+</head>
+<body id="app-body" class="bg-sunny">
+    
+    <!-- Pull to Refresh Indicator -->
+    <div class="pull-refresh" id="pullRefresh">
+        <i class="bi bi-arrow-down-circle"></i> Kéo để cập nhật
+    </div>
+
+    <!-- Loading Spinner -->
+    <div class="loading" id="loadingSpinner">
+        <div class="spinner"></div>
+    </div>
+
+    <!-- Header -->
+    <header class="weather-header">
+        <div class="row align-items-center">
+            <div class="col-8">
+                <h1 class="h3 mb-1 slide-in">
+                    <i class="bi bi-geo-alt"></i> Hồ Chí Minh
+                </h1>
+                <div class="weather-info fade-in">
+                    <span id="weatherDesc">Đang tải...</span>
+                </div>
+                <div class="weather-info fade-in">
+                    <small id="lastUpdate">Cập nhật: --:--</small>
+                </div>
+            </div>
+            <div class="col-4 text-end">
+                <div class="weather-icon fade-in" id="weatherIcon">
+                    <i class="bi bi-cloud-sun"></i>
+                </div>
+                <div class="temp-display fade-in" id="currentTemp">--°</div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Date Picker -->
+    <div class="date-picker">
+        <div class="row">
+            <div class="col-12">
+                <div class="d-flex flex-wrap justify-content-center" id="datePicker">
+                    <!-- Date buttons will be generated here -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Chart -->
+    <div class="chart-container fade-in">
+        <h5 class="mb-3 text-center">
+            <i class="bi bi-graph-up"></i> Biểu Đồ Thời Tiết 24h
+        </h5>
+        <div class="chart-wrapper">
+            <canvas id="weatherChart"></canvas>
+        </div>
+    </div>
+
+    <!-- Weather Details -->
+    <div class="row mx-2">
+        <div class="col-6 col-md-3 mb-3">
+            <div class="chart-container text-center">
+                <i class="bi bi-droplet text-primary fs-3"></i>
+                <div class="mt-2">
+                    <div class="fw-bold" id="humidity">--%</div>
+                    <small class="text-muted">Độ ẩm</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-md-3 mb-3">
+            <div class="chart-container text-center">
+                <i class="bi bi-wind text-success fs-3"></i>
+                <div class="mt-2">
+                    <div class="fw-bold" id="windSpeed">-- km/h</div>
+                    <small class="text-muted">Gió</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-md-3 mb-3">
+            <div class="chart-container text-center">
+                <i class="bi bi-eye text-info fs-3"></i>
+                <div class="mt-2">
+                    <div class="fw-bold" id="visibility">-- km</div>
+                    <small class="text-muted">Tầm nhìn</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-md-3 mb-3">
+            <div class="chart-container text-center">
+                <i class="bi bi-thermometer text-warning fs-3"></i>
+                <div class="mt-2">
+                    <div class="fw-bold" id="feelsLike">--°C</div>
+                    <small class="text-muted">Cảm giác</small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="container-fluid">
+            <small>
+                <i class="bi bi-cloud-arrow-down"></i> 
+                Dữ liệu từ OpenWeatherMap API
+            </small>
+            <br>
+            <small class="text-muted">Weather TPHCM - PWA Ready</small>
+        </div>
+    </footer>
+
+    <!-- Rain Animation Container -->
+    <div class="rain" id="rainAnimation"></div>
+    
+    <!-- Stars Animation Container -->
+    <div class="stars" id="starsAnimation"></div>
+
+    <script>
+        // Global variables
+        const API_KEY = 'YOUR_API_KEY_HERE'; // Replace with your OpenWeatherMap API key
+        const CITY_LAT = 10.8231;
+        const CITY_LON = 106.6297;
+        let weatherChart = null;
+        let currentDate = new Date();
+        let weatherData = {};
+
+        // Sample data for testing without API key
+        const SAMPLE_DATA = {
+            current: {
+                temp: 28,
+                feels_like: 32,
+                humidity: 78,
+                wind_speed: 3.2,
+                visibility: 8000,
+                weather: [{
+                    main: 'Clouds',
+                    description: 'Nhiều mây',
+                    icon: '04d'
+                }]
+            },
+            hourly: Array.from({length: 24}, (_, i) => ({
+                dt: Date.now() / 1000 + (i * 3600),
+                temp: 26 + Math.sin(i * Math.PI / 12) * 4 + Math.random() * 2,
+                humidity: 70 + Math.random() * 20,
+                pop: Math.random() * 0.6,
+                rain: Math.random() > 0.7 ? {['1h']: Math.random() * 5} : undefined
+            }))
+        };
+
+        // Initialize app
+        document.addEventListener('DOMContentLoaded', function() {
+            initializeDatePicker();
+            initializeChart();
+            loadWeatherData();
+            setupPullToRefresh();
+            
+            // Register service worker
+            if ('serviceWorker' in navigator) {
+                navigator.serviceWorker.register('sw.js')
+                    .then(reg => console.log('SW registered'))
+                    .catch(err => console.log('SW registration failed'));
+            }
+        });
+
+        // Initialize date picker
+        function initializeDatePicker() {
+            const datePicker = document.getElementById('datePicker');
+            const today = new Date();
+            
+            // Generate dates: 5 days ago to 2 days ahead
+            for (let i = -5; i <= 2; i++) {
+                const date = new Date(today);
+                date.setDate(today.getDate() + i);
+                
+                const btn = document.createElement('button');
+                btn.className = `date-btn ${i === 0 ? 'active' : ''}`;
+                btn.onclick = () => selectDate(date, btn);
+                
+                if (i === 0) {
+                    btn.innerHTML = 'Hôm nay';
+                } else if (i === -1) {
+                    btn.innerHTML = 'Hôm qua';
+                } else if (i === 1) {
+                    btn.innerHTML = 'Ngày mai';
+                } else {
+                    btn.innerHTML = date.getDate() + '/' + (date.getMonth() + 1);
+                }
+                
+                datePicker.appendChild(btn);
+            }
+        }
+
+        // Select date
+        function selectDate(date, button) {
+            // Remove active class from all buttons
+            document.querySelectorAll('.date-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            
+            // Add active class to selected button
+            button.classList.add('active');
+            
+            currentDate = date;
+            updateChart();
+        }
+
+        // Initialize chart
+        function initializeChart() {
+            const ctx = document.getElementById('weatherChart').getContext('2d');
+            
+            weatherChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: Array.from({length: 24}, (_, i) => i + 'h'),
+                    datasets: [
+                        {
+                            label: 'Nhiệt độ (°C)',
+                            data: [],
+                            borderColor: '#ef4444',
+                            backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                            tension: 0.4,
+                            yAxisID: 'y'
+                        },
+                        {
+                            label: 'Độ ẩm (%)',
+                            data: [],
+                            borderColor: '#3b82f6',
+                            backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                            tension: 0.4,
+                            yAxisID: 'y1'
+                        },
+                        {
+                            label: 'Mưa (mm)',
+                            data: [],
+                            borderColor: '#10b981',
+                            backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                            tension: 0.4,
+                            yAxisID: 'y2'
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: {
+                        mode: 'index',
+                        intersect: false,
+                    },
+                    scales: {
+                        x: {
+                            display: true,
+                            title: {
+                                display: true,
+                                text: 'Giờ trong ngày'
+                            }
+                        },
+                        y: {
+                            type: 'linear',
+                            display: true,
+                            position: 'left',
+                            title: {
+                                display: true,
+                                text: 'Nhiệt độ (°C)',
+                                color: '#ef4444'
+                            },
+                            grid: {
+                                drawOnChartArea: false,
+                            },
+                        },
+                        y1: {
+                            type: 'linear',
+                            display: false,
+                            position: 'right',
+                            min: 0,
+                            max: 100,
+                            grid: {
+                                drawOnChartArea: false,
+                            },
+                        },
+                        y2: {
+                            type: 'linear',
+                            display: false,
+                            position: 'right',
+                            min: 0,
+                            max: 10,
+                            grid: {
+                                drawOnChartArea: false,
+                            },
+                        },
+                    },
+                    plugins: {
+                        legend: {
+                            display: true,
+                            position: 'top'
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    let label = context.dataset.label || '';
+                                    if (label) {
+                                        label += ': ';
+                                    }
+                                    label += context.parsed.y;
+                                    if (context.datasetIndex === 0) label += '°C';
+                                    if (context.datasetIndex === 1) label += '%';
+                                    if (context.datasetIndex === 2) label += 'mm';
+                                    return label;
+                                }
+                            }
+                        }
+                    },
+                    animation: {
+                        duration: 1000,
+                        easing: 'easeInOutQuart'
+                    }
+                }
+            });
+        }
+
+        // Load weather data
+        async function loadWeatherData() {
+            showLoading(true);
+            
+            try {
+                // Check if we have API key
+                if (API_KEY === 'YOUR_API_KEY_HERE') {
+                    console.log('Using sample data - add your API key for real data');
+                    weatherData = SAMPLE_DATA;
+                    updateUI();
+                    return;
+                }
+
+                // Load from cache first
+                const cached = localStorage.getItem('weatherData');
+                if (cached) {
+                    const {data, timestamp} = JSON.parse(cached);
+                    if (Date.now() - timestamp < 30 * 60 * 1000) { // 30 minutes
+                        weatherData = data;
+                        updateUI();
+                        return;
+                    }
+                }
+
+                // Fetch new data
+                const [currentResponse, forecastResponse] = await Promise.all([
+                    fetch(`https://api.openweathermap.org/data/2.5/weather?lat=${CITY_LAT}&lon=${CITY_LON}&appid=${API_KEY}&units=metric&lang=vi`),
+                    fetch(`https://api.openweathermap.org/data/2.5/forecast?lat=${CITY_LAT}&lon=${CITY_LON}&appid=${API_KEY}&units=metric&lang=vi`)
+                ]);
+
+                if (!currentResponse.ok || !forecastResponse.ok) {
+                    throw new Error('API request failed');
+                }
+
+                const currentData = await currentResponse.json();
+                const forecastData = await forecastResponse.json();
+
+                weatherData = {
+                    current: currentData,
+                    hourly: forecastData.list
+                };
+
+                // Cache the data
+                localStorage.setItem('weatherData', JSON.stringify({
+                    data: weatherData,
+                    timestamp: Date.now()
+                }));
+
+                updateUI();
+
+            } catch (error) {
+                console.error('Error loading weather data:', error);
+                
+                // Try to use cached data
+                const cached = localStorage.getItem('weatherData');
+                if (cached) {
+                    const {data} = JSON.parse(cached);
+                    weatherData = data;
+                    updateUI();
+                } else {
+                    // Use sample data as fallback
+                    weatherData = SAMPLE_DATA;
+                    updateUI();
+                }
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        // Update UI with weather data
+        function updateUI() {
+            const current = weatherData.current;
+            
+            // Update current weather
+            document.getElementById('currentTemp').textContent = Math.round(current.temp) + '°';
+            document.getElementById('weatherDesc').textContent = current.weather[0].description;
+            document.getElementById('humidity').textContent = current.humidity + '%';
+            document.getElementById('windSpeed').textContent = (current.wind_speed * 3.6).toFixed(1) + ' km/h';
+            document.getElementById('visibility').textContent = (current.visibility / 1000).toFixed(1) + ' km';
+            document.getElementById('feelsLike').textContent = Math.round(current.feels_like) + '°C';
+            document.getElementById('lastUpdate').textContent = 'Cập nhật: ' + new Date().toLocaleTimeString('vi-VN');
+
+            // Update weather icon
+            updateWeatherIcon(current.weather[0].main);
+            
+            // Update background
+            updateBackground(current.weather[0].main);
+            
+            // Update chart
+            updateChart();
+        }
+
+        // Update weather icon
+        function updateWeatherIcon(condition) {
+            const iconElement = document.getElementById('weatherIcon');
+            const iconMap = {
+                'Clear': 'bi-sun',
+                'Clouds': 'bi-cloud',
+                'Rain': 'bi-cloud-rain',
+                'Drizzle': 'bi-cloud-drizzle',
+                'Thunderstorm': 'bi-cloud-lightning',
+                'Snow': 'bi-cloud-snow',
+                'Mist': 'bi-cloud-fog',
+                'Fog': 'bi-cloud-fog'
+            };
+            
+            const iconClass = iconMap[condition] || 'bi-cloud-sun';
+            iconElement.innerHTML = `<i class="bi ${iconClass}"></i>`;
+        }
+
+        // Update background based on weather
+        function updateBackground(condition) {
+            const body = document.getElementById('app-body');
+            const hour = new Date().getHours();
+            const isNight = hour < 6 || hour > 18;
+            
+            // Clear all background classes
+            body.className = '';
+            
+            // Add new background class
+            if (isNight) {
+                body.classList.add('bg-night');
+                showStars();
+            } else if (condition === 'Rain' || condition === 'Drizzle' || condition === 'Thunderstorm') {
+                body.classList.add('bg-rainy');
+                showRain();
+            } else if (condition === 'Clouds') {
+                body.classList.add('bg-cloudy');
+            } else {
+                body.classList.add('bg-sunny');
+            }
+        }
+
+        // Show rain animation
+        function showRain() {
+            const rainContainer = document.getElementById('rainAnimation');
+            rainContainer.innerHTML = '';
+            
+            for (let i = 0; i < 50; i++) {
+                const drop = document.createElement('div');
+                drop.className = 'raindrop';
+                drop.style.left = Math.random() * 100 + '%';
+                drop.style.animationDuration = (Math.random() * 0.5 + 0.5) + 's';
+                drop.style.animationDelay = Math.random() * 2 + 's';
+                rainContainer.appendChild(drop);
+            }
+        }
+
+        // Show stars animation
+        function showStars() {
+            const starsContainer = document.getElementById('starsAnimation');
+            starsContainer.innerHTML = '';
+            
+            for (let i = 0; i < 30; i++) {
+                const star = document.createElement('div');
+                star.className = 'star';
+                star.style.left = Math.random() * 100 + '%';
+                star.style.top = Math.random() * 100 + '%';
+                star.style.width = star.style.height = (Math.random() * 3 + 1) + 'px';
+                star.style.animationDelay = Math.random() * 2 + 's';
+                starsContainer.appendChild(star);
+            }
+        }
+
+        // Update chart with selected date data
+        function updateChart() {
+            if (!weatherChart || !weatherData.hourly) return;
+            
+            const hourlyData = weatherData.hourly.slice(0, 24);
+            
+            const temperatures = hourlyData.map(hour => hour.temp);
+            const humidity = hourlyData.map(hour => hour.humidity);
+            const rain = hourlyData.map(hour => {
+                return hour.rain ? hour.rain['1h'] || 0 : hour.pop * 10; // Convert probability to mm estimate
+            });
+            
+            weatherChart.data.datasets[0].data = temperatures;
+            weatherChart.data.datasets[1].data = humidity;
+            weatherChart.data.datasets[2].data = rain;
+            
+            weatherChart.update('active');
+        }
+
+        // Show/hide loading spinner
+        function showLoading(show) {
+            const loading = document.getElementById('loadingSpinner');
+            loading.style.display = show ? 'block' : 'none';
+        }
+
+        // Setup pull to refresh
+        function setupPullToRefresh() {
+            let startY = 0;
+            let currentY = 0;
+            let isPulling = false;
+            
+            document.addEventListener('touchstart', (e) => {
+                if (window.scrollY === 0) {
+                    startY = e.touches[0].clientY;
+                    isPulling = true;
+                }
+            });
+            
+            document.addEventListener('touchmove', (e) => {
+                if (!isPulling) return;
+                
+                currentY = e.touches[0].clientY;
+                const pullDistance = currentY - startY;
+                
+                if (pullDistance > 0 && pullDistance < 100) {
+                    const pullRefresh = document.getElementById('pullRefresh');
+                    pullRefresh.style.opacity = pullDistance / 100;
+                    pullRefresh.style.top = (pullDistance - 60) + 'px';
+                    
+                    if (pullDistance > 60) {
+                        pullRefresh.classList.add('active');
+                        pullRefresh.innerHTML = '<i class="bi bi-arrow-up-circle"></i> Thả để cập nhật';
+                    }
+                }
+            });
+            
+            document.addEventListener('touchend', (e) => {
+                if (!isPulling) return;
+                
+                const pullDistance = currentY - startY;
+                const pullRefresh = document.getElementById('pullRefresh');
+                
+                if (pullDistance > 60) {
+                    loadWeatherData();
+                    if (navigator.vibrate) navigator.vibrate(50);
+                }
+                
+                pullRefresh.classList.remove('active');
+                pullRefresh.style.opacity = '0';
+                pullRefresh.style.top = '-60px';
+                pullRefresh.innerHTML = '<i class="bi bi-arrow-down-circle"></i> Kéo để cập nhật';
+                
+                isPulling = false;
+            });
+        }
+
+        // Auto refresh every 30 minutes
+        setInterval(loadWeatherData, 30 * 60 * 1000);
+
+        // Handle orientation change
+        window.addEventListener('orientationchange', () => {
+            setTimeout(() => {
+                if (weatherChart) {
+                    weatherChart.resize();
+                }
+            }, 500);
+        });
+    </script>
+</body>
+</html>
